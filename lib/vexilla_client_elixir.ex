@@ -22,7 +22,7 @@ defmodule VexillaClientElixir do
     when is_binary(base_url) and is_binary(environment) do
       %{
         base_url: base_url,
-        environment: environment
+        environment: environment,
       }
   end
 
@@ -64,13 +64,13 @@ defmodule VexillaClientElixir do
 
   ## Examples
 
-    iex> VexillaClientElixir.should?(%{"untagged" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing")
+    iex> VexillaClientElixir.should?(%{"untagged" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "b7e91cc5-ec76-4ec3-9c1c-075032a13a1a")
     false
 
   """
-  def should?(flags, flagName) do
+  def should?(flags, flagName, instance_id) do
     feature = flags["untagged"][flagName]
-    inner_should?(feature)
+    inner_should?(feature, instance_id)
   end
 
   @doc """
@@ -78,21 +78,31 @@ defmodule VexillaClientElixir do
 
   ## Examples
 
-    iex> VexillaClientElixir.should?(%{"features" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "features")
+    iex> VexillaClientElixir.should?(%{"features" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "b7e91cc5-ec76-4ec3-9c1c-075032a13a1a", "features")
     false
 
   """
-  def should?(flags, flagName, groupName) do
+  def should?(flags, flagName, instance_id, groupName) do
     feature = flags[groupName][flagName]
-    inner_should?(feature)
+    inner_should?(feature, instance_id)
   end
 
-  defp inner_should?(feature) do
+  defp inner_should?(feature, instance_id) do
     case feature["type"] do
       "toggle" -> feature["value"]
-      "gradual" -> feature["value"]
-      # _ -> IO.inspect()
+      "gradual" -> should_gradual?(feature["value"], instance_id, feature["seed"])
     end
+  end
+
+  defp should_gradual?(value, instance_id, seed) do
+    hash_instance_id(instance_id, seed) <= value
+  end
+
+  defp hash_instance_id(instance_id, seed) do
+    characters = String.to_charlist(instance_id)
+    character_total = Enum.sum(characters)
+
+    rem(Kernel.trunc(Float.floor(character_total * seed * 42.0)), 100)
   end
 
 end
