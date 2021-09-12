@@ -1,17 +1,14 @@
-
-
-defmodule VexillaClientElixir do
+defmodule VexillaClient do
   @moduledoc """
-  Documentation for `VexillaClientElixir`.
+  Documentation for `VexillaClient`.
   """
-
 
   @doc """
   Create a client with a base url and environment name
 
   ## Examples
 
-    iex> VexillaClientElixir.create_config("https://somewhere-on-the-internet", "staging")
+    iex> VexillaClient.create_config("https://somewhere-on-the-internet", "staging")
     %{
       base_url: "https://somewhere-on-the-internet",
       environment: "staging"
@@ -19,20 +16,22 @@ defmodule VexillaClientElixir do
 
   """
   def create_config(base_url, environment)
-    when is_binary(base_url) and is_binary(environment) do
-      %{
-        base_url: base_url,
-        environment: environment,
-      }
+      when is_binary(base_url) and is_binary(environment) do
+    %{
+      base_url: base_url,
+      environment: environment
+    }
   end
-
 
   @doc """
   Fetch the flags and parse, returning the appropriate flags for the environment
 
   ## Examples
 
-    iex> VexillaClientElixir.get_flags(%{base_url: "https://streamparrot-feature-flags.s3.amazonaws.com",environment: "staging"}, "features")
+    iex> VexillaClient.get_flags(%{base_url: "https://streamparrot-feature-flags.s3.amazonaws.com",environment: "staging"}, "features", fn base_url, file_name ->
+        HTTPoison.start()
+        flags_response = HTTPoison.get!("\#{base_url}/\#{file_name}.json")
+    end)
     %{
       "untagged" => %{
         "billing" => %{
@@ -49,22 +48,30 @@ defmodule VexillaClientElixir do
     }
 
   """
-  def get_flags(config, fileName) do
-    HTTPoison.start()
-    flags_response = HTTPoison.get!("#{config.base_url}/#{fileName}.json")
+  def get_flags(config, fileName, httpCallback) when is_function(httpCallback) do
+    flags_response = httpCallback.(config.base_url, fileName)
 
     flags_response_parsed = Jason.decode!(flags_response.body)
 
     flags_response_parsed["environments"][config.environment]
   end
 
+  # original:
+  # def get_flags(config, fileName) do
+  #   HTTPoison.start()
+  #   flags_response = HTTPoison.get!("#{config.base_url}/#{fileName}.json")
+
+  #   flags_response_parsed = Jason.decode!(flags_response.body)
+
+  #   flags_response_parsed["environments"][config.environment]
+  # end
 
   @doc """
   Checks if the flag allows this feature to be used
 
   ## Examples
 
-    iex> VexillaClientElixir.should?(%{"untagged" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "b7e91cc5-ec76-4ec3-9c1c-075032a13a1a")
+    iex> VexillaClient.should?(%{"untagged" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "b7e91cc5-ec76-4ec3-9c1c-075032a13a1a")
     false
 
   """
@@ -78,7 +85,7 @@ defmodule VexillaClientElixir do
 
   ## Examples
 
-    iex> VexillaClientElixir.should?(%{"features" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "b7e91cc5-ec76-4ec3-9c1c-075032a13a1a", "features")
+    iex> VexillaClient.should?(%{"features" => %{"billing" => %{"type" => "toggle","value" => false}}}, "billing", "b7e91cc5-ec76-4ec3-9c1c-075032a13a1a", "features")
     false
 
   """
@@ -104,5 +111,4 @@ defmodule VexillaClientElixir do
 
     rem(Kernel.trunc(Float.floor(character_total * seed * 42.0)), 100)
   end
-
 end
